@@ -12,6 +12,7 @@
 - [โครงสร้างโปรเจกต์](#-โครงสร้างโปรเจกต์)
 - [การติดตั้งและตั้งค่า](#-การติดตั้งและตั้งค่า)
 - [การใช้งาน](#-การใช้งาน)
+- [Wazuh SIEM](#-wazuh-siem)
 - [SecOps Demo Workflow](#-secops-demo-workflow)
 - [การตรวจสอบระบบ](#-การตรวจสอบระบบ)
 - [การแก้ไขปัญหา](#-การแก้ไขปัญหา)
@@ -27,16 +28,28 @@
 ### สถาปัตยกรรมระบบ
 
 ```
-┌─────────────────┐
-│   n8n-secops    │  ← Orchestration Platform + Security Tools
-│   (Attacker)    │
-└────────┬────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    n8n-secops                           │
+│         (Orchestrator + Security Tools)                 │
+│              (Kali, Nuclei, Nmap)                       │
+└────────┬────────────────────────────────────────────────┘
          │
-         ├───┐
-         │   │
-    ┌────▼───▼────┐
-    │  victim-app │  ← Vulnerable Target (Nginx)
-    └─────────────┘
+         ├───┐                    ┌──────────────────┐
+         │   │                    │  Wazuh Stack      │
+         │   │                    │  (SIEM/EDR)       │
+         │   │                    │                   │
+         │   │◄───────────────────│ • Indexer         │
+         │   │                    │ • Manager         │
+         │   │                    │ • Dashboard       │
+         │   │                    └──────────────────┘
+         ▼   ▼
+    ┌────────────────────────────────────────────────────┐
+    │              Victim Targets                       │
+    │  ┌─────────────┐  ┌─────────────┐  ┌───────────┐ │
+    │  │ victim-app  │  │ juice-shop  │  │metaspl2   │ │
+    │  │  (Nginx)    │  │  (Node.js)  │  │           │ │
+    │  └─────────────┘  └─────────────┘  └───────────┘ │
+    └────────────────────────────────────────────────────┘
          │
     ┌────▼────┐
     │ postgres│  ← Database for n8n
@@ -48,6 +61,7 @@
 ## ✨ คุณสมบัติหลัก
 
 - **🔧 Security Tools Integration**: รองรับ Nuclei v3.x และ Nmap พร้อมใช้งานทันที
+- **🔍 Wazuh SIEM Integration**: รวม Wazuh Stack (Indexer, Manager, Dashboard) สำหรับการตรวจสอบความปลอดภัยแบบ Real-time และการวิเคราะห์ Logs
 - **🤖 AI-Powered Automation**: ใช้ OpenAI เพื่อแปลง Natural Language เป็น Security Commands
 - **📱 Line Messaging Integration**: รับคำสั่งและส่งรายงานผ่าน Line Bot
 - **🐳 Docker-Based Environment**: รันได้บนทุก Platform (Windows/Linux/macOS, ARM64/AMD64)
@@ -87,20 +101,34 @@
 n8n-secops-lab/
 ├── .env                      # Environment Variables (ไม่ถูก commit)
 ├── .env.example              # ตัวอย่าง Environment Variables
-├── Dockerfile                # Custom n8n Image with Security Tools
-├── docker-compose.yml        # Docker Compose Configuration
-├── secops-workflow.json      # SecOps Demo Workflow
-├── WORKFLOW_GUIDE.md         # คู่มือการใช้งาน Workflow
-├── README.md                 # เอกสารนี้
-└── vulnerable_data/          # Vulnerable Target Data
-    └── .env                  # ไฟล์จำลองที่เปิดเผย (สำหรับ Demo)
+├── docker-compose.yml        # Docker Compose Configuration (รวม Wazuh Stack)
+├── Dockerfile.n8n           # Custom n8n Image with Security Tools
+├── Dockerfile.kali          # Kali Linux Image with Security Tools
+├── Dockerfile.wazuh-manager # Custom Wazuh Manager Image
+├── wazuh_manager_entrypoint.sh  # Wazuh Manager Entrypoint Script
+├── wazuh_n8n_integration.py     # Wazuh-n8n Integration Script
+├── manual_alert.json        # Manual Alert for Testing
+├── security_report.md       # Sample Security Report
+├── README.md                # เอกสารนี้
+├── vulnerable_data/          # Vulnerable Target Data
+│   └── .env                 # ไฟล์จำลองที่เปิดเผย (สำหรับ Demo)
+├── Workflow_1/              # Advanced SecOps AI Pipeline
+│   ├── Advanced SecOps AI Pipeline.json
+│   ├── Kali Executor Tool.json
+│   └── README.md
+└── Workflow_2/              # WebSecScan Pro - Multi-Agent AI
+    ├── WebSecScan Pro - Workflow Tools Edition.json
+    ├── WebSec_SubAgent_Worker.json
+    └── README.md
 ```
 
 ### คำอธิบายไฟล์สำคัญ
 
-- **`Dockerfile`**: สร้าง Custom n8n Image ที่ติดตั้ง Nuclei, Nmap, และ Tools อื่นๆ
-- **`docker-compose.yml`**: กำหนด Services ทั้งหมด (n8n, victim-app, postgres, cloudflared)
-- **`secops-workflow.json`**: Workflow ตัวอย่างสำหรับ SecOps Demo
+- **`docker-compose.yml`**: กำหนด Services ทั้งหมด (n8n, victim-app, postgres, Kali Linux, **Wazuh Stack**)
+- **`Dockerfile.n8n`**: สร้าง Custom n8n Image ที่ติดตั้ง Nuclei, Nmap, และ Tools อื่นๆ
+- **`Dockerfile.kali`**: สร้าง Kali Linux Container พร้อม Security Tools
+- **`Dockerfile.wazuh-manager`**: สร้าง Wazuh Manager Custom Image
+- **`wazuh_n8n_integration.py`**: Script สำหรับ Integration ระหว่าง Wazuh และ n8n
 - **`vulnerable_data/.env`**: ไฟล์จำลองที่เปิดเผยเพื่อใช้ในการทดสอบ
 
 ---
@@ -252,48 +280,85 @@ nuclei -u http://victim-app -json -silent
 
 ---
 
+## � Wazuh SIEM
+
+### เข้าถึง Wazuh Dashboard
+
+1. เปิด Browser ไปที่: **https://localhost** (หรือ **https://localhost:443**)
+2. Login ด้วย:
+   - **Username**: `admin`
+   - **Password**: `SecretPassword123!`
+
+### การตรวจสอบ Agents
+
+ตรวจสอบสถานะ Wazuh Agents:
+
+```bash
+# ดูรายการ Agents ทั้งหมด
+docker exec -it wazuh-manager /var/ossec/bin/agent_control -l
+
+# ตรวจสอบสถานะ Agent ที่เฉพาะเจาะจง (ID 001)
+docker exec -it wazuh-manager /var/ossec/bin/agent_control -i 001
+```
+
+### การดู Alerts
+
+Alerts จะถูกส่งไปยัง Wazuh Dashboard โดยอัตโนมัติ คุณสามารถดูได้ที่:
+- **Security Events** → **Alerts**
+- หรือผ่าน API: `https://localhost/app/wazuh`
+
+### การทดสอบส่ง Alert (เพื่อทดสอบ Integration)
+
+```bash
+# ส่ง Alert ทดสอบผ่าน Wazuh API
+curl -k -u admin:SecretPassword123! -X POST \
+  https://localhost:55000/security/events \
+  -H "Content-Type: application/json" \
+  -d @manual_alert.json
+```
+
+### Integration กับ n8n
+
+ระบบมี `wazuh_n8n_integration.py` สำหรับเชื่อมต่อ Wazuh Alerts เข้ากับ n8n Workflows:
+
+```bash
+# รัน Integration Script
+docker exec -it n8n-secops python /home/node/wazuh_n8n_integration.py
+```
+
+สามารถดูรายงานตัวอย่างได้ที่ `security_report.md`
+
+---
+
 ## 🔄 SecOps Demo Workflow
 
-### ภาพรวม Workflow
+โปรเจกต์นี้มี 2 Workflows หลักสำหรับการทดสอบความปลอดภัยแบบอัตโนมัติ:
 
-Workflow ตัวอย่าง (`secops-workflow.json`) แสดงการใช้งาน AI-Powered Security Automation ที่สามารถ:
+### 1. Advanced SecOps AI Pipeline (`Workflow_1/`)
 
-1. **รับคำสั่ง Natural Language** ผ่าน Line Messaging API
-2. **แปลงคำสั่งเป็น Nmap Command** ด้วย AI
-3. **สแกน Ports** และ Parse ผลลัพธ์
-4. **เตรียม Targets** สำหรับ Nuclei อัตโนมัติ
-5. **สแกนช่องโหว่** ด้วย Nuclei
-6. **สร้างรายงาน** ด้วย AI และส่งกลับผ่าน Line
+ใช้ Kali Linux + AI Agents สำหรับการสแกนความปลอดภัย:
+- **Natural Language Commands** - รับคำสั่งภาษาไทย/อังกฤษ
+- **Kali Tools Integration** - Nmap, Nuclei, Metasploit
+- **Discord Reporting** - ส่งรายงานผ่าน Discord Webhook
 
-### ฟีเจอร์หลัก
-
-| ฟีเจอร์ | คำอธิบาย |
-|---------|----------|
-| **Natural Language Processing** | รับคำสั่งภาษาไทย/อังกฤษและแปลงเป็น Security Commands |
-| **Intelligent Port Detection** | ตรวจจับ Ports ที่เปิดและสร้าง URL Targets อัตโนมัติ |
-| **Automated Vulnerability Scanning** | สแกนช่องโหว่ด้วย Nuclei (focus: exposure tags) |
-| **AI-Powered Reporting** | สร้างรายงานสรุปผลการสแกนเป็นภาษาไทย |
-| **Line Bot Integration** | ส่งและรับข้อความผ่าน Line Messenger |
-
-### ตัวอย่างการใช้งาน
-
-ส่งข้อความผ่าน Line Bot:
-
+**ตัวอย่างคำสั่ง**:
 ```
-สแกนพอร์ตเว็บเครื่อง victim-app แบบด่วน
+สแกนเครื่อง juice-shop-victim ที่พอร์ต 3000 ตรวจสอบ tech stack
 ```
 
-```
-Full scan on victim-app with OS detection
-```
+### 2. WebSecScan Pro (`Workflow_2/`)
 
-```
-สแกนพอร์ต 80, 443, 8080 ของ victim-app
-```
+ใช้ Multi-Agent AI ตามมาตรฐาน OWASP ASVS:
+- **Form Trigger** - กรอก URL ผ่านหน้าเว็บฟอร์ม
+- **Multi-Agent System** - Orchestrator + Sub-Agents (Recon, Transport, Identity, Correlation)
+- **ASVS Compliance** - ตรวจสอบตามมาตรฐาน OWASP
+- **Markdown Reports** - ส่งรายงานเป็นไฟล์ `.md` ไปยัง Discord
+
+**วิธีใช้งาน**: เปิด Workflow → Execute → กรอก Target URL ในฟอร์ม → รอรับรายงาน
 
 ### เอกสารเพิ่มเติม
 
-ดูรายละเอียดการตั้งค่าและใช้งานใน **[WORKFLOW_GUIDE.md](./WORKFLOW_GUIDE.md)**
+ดูรายละเอียดการตั้งค่าและใช้งานใน **[Workflow_1/README.md](./Workflow_1/README.md)** และ **[Workflow_2/README.md](./Workflow_2/README.md)**
 
 ---
 
@@ -333,6 +398,21 @@ docker network inspect secops_secops_net
 
 **ผลลัพธ์ที่คาดหวัง**: ควรเข้าสู่ระบบได้และเห็น Dashboard
 
+#### 5. ตรวจสอบ Wazuh Dashboard
+
+เปิด Browser ไปที่ **https://localhost** และ Login
+
+**ผลลัพธ์ที่คาดหวัง**: ควรเข้าสู่ Wazuh Dashboard ได้และเห็น Security Events
+
+#### 6. ตรวจสอบ Wazuh Agents
+
+```bash
+# ดูรายการ Agents
+docker exec -it wazuh-manager /var/ossec/bin/agent_control -l
+```
+
+**ผลลัพธ์ที่คาดหวัง**: ควรเห็น victim-app Agent มีสถานะ **Active**
+
 ---
 
 ## 🔧 การแก้ไขปัญหา
@@ -364,6 +444,49 @@ docker network create secops_net
 # Restart Services
 docker-compose restart
 ```
+
+#### Wazuh Dashboard ไม่เปิด
+
+**วิธีแก้ไข**:
+
+1. **ตรวจสอบ Wazuh Services**:
+   ```bash
+   docker-compose ps | grep wazuh
+   ```
+
+2. **ตรวจสอบ Wazuh Manager Logs**:
+   ```bash
+   docker logs wazuh-manager
+   ```
+
+3. **ตรวจสอบ Wazuh Indexer Logs**:
+   ```bash
+   docker logs wazuh-indexer
+   ```
+
+4. **Restart Wazuh Stack**:
+   ```bash
+   docker-compose restart wazuh.manager wazuh.indexer wazuh.dashboard
+   ```
+
+#### Wazuh Agent ไม่เชื่อมต่อ
+
+**วิธีแก้ไข**:
+
+1. **ตรวจสอบ Agent Status**:
+   ```bash
+   docker exec -it wazuh-manager /var/ossec/bin/agent_control -l
+   ```
+
+2. **รีสตาร์ท victim-app Container**:
+   ```bash
+   docker-compose restart victim-app
+   ```
+
+3. **ตรวจสอบ Agent Logs**:
+   ```bash
+   docker exec -it victim-app tail -f /var/ossec/logs/ossec.log
+   ```
 
 #### n8n UI ไม่เปิด
 
@@ -423,6 +546,12 @@ docker-compose logs -f victim-app
 
 # postgres Logs
 docker-compose logs -f postgres
+
+# Wazuh Manager Logs
+docker-compose logs -f wazuh.manager
+
+# Wazuh Dashboard Logs
+docker-compose logs -f wazuh.dashboard
 ```
 
 ---
@@ -434,6 +563,7 @@ docker-compose logs -f postgres
 - [n8n Documentation](https://docs.n8n.io/) - เอกสาร n8n อย่างเป็นทางการ
 - [Nuclei Documentation](https://docs.nuclei.sh/) - เอกสาร Nuclei Scanner
 - [Nmap Documentation](https://nmap.org/book/) - เอกสาร Nmap Network Scanner
+- [Wazuh Documentation](https://documentation.wazuh.com/) - เอกสาร Wazuh SIEM
 - [Docker Documentation](https://docs.docker.com/) - เอกสาร Docker
 
 ### API Documentation
@@ -443,7 +573,8 @@ docker-compose logs -f postgres
 
 ### เอกสารภายในโปรเจกต์
 
-- **[WORKFLOW_GUIDE.md](./WORKFLOW_GUIDE.md)** - คู่มือการใช้งาน Workflow อย่างละเอียด
+- **[Workflow_1/README.md](./Workflow_1/README.md)** - เอกสาร Advanced SecOps AI Pipeline (Kali + AI)
+- **[Workflow_2/README.md](./Workflow_2/README.md)** - เอกสาร WebSecScan Pro (Multi-Agent AI)
 
 ---
 
@@ -490,7 +621,7 @@ docker-compose logs -f postgres
 สำหรับคำถามหรือความช่วยเหลือ กรุณาติดต่อผ่าน:
 
 - **Issues**: สร้าง Issue ใน Repository
-- **Documentation**: อ่านเอกสารใน `WORKFLOW_GUIDE.md`
+- **Documentation**: อ่านเอกสารใน `Workflow_1/README.md` และ `Workflow_2/README.md`
 
 ---
 
